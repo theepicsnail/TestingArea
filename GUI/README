@@ -1,0 +1,13 @@
+To run this:
+
+Start the display server:
+
+    python Display.py &
+
+Then start the program:
+
+    python program.py
+
+Move the mouse around on the display
+Click the mouse to change the starting point
+
