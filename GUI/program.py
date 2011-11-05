@@ -36,6 +36,7 @@ echannel.queue_bind(exchange='events',
 lx=0
 ly=0
 def callback(ch, method, properties, body):
+    global lx,ly
     d = eval(body)
     print "P in",body
     if d["type"]==4:
@@ -46,7 +47,6 @@ def callback(ch, method, properties, body):
         drawLine(lx,ly,d["pos"][0],d["pos"][1])
         flip()
     if d["type"]==5:
-        global lx,ly
         lx,ly=d["pos"]
 echannel.basic_consume(callback,
                        queue=queue_name,
