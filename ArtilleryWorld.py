@@ -61,7 +61,7 @@ class Bullet:
         self.dx += acc[0]*dt
         self.dy += acc[1]*dt
         return False
-    
+        
 class AltitudeBullet(Bullet):
     lastVel = None
     peaked = False
@@ -119,7 +119,7 @@ class Frag(Bullet):
     color=[255,0,0]
     def step(self,dt):
         if Bullet.step(self,dt):
-            dist = hypot(self.dy,self.dx)
+            dist = hypot(self.dy,self.dx)*.5
             self.x-=self.dx*dt
             self.y-=self.dy*dt
             for i in xrange(32):
@@ -350,7 +350,8 @@ while True:
     pygame.draw.rect(window,[0,255,0],(250,0,direction*20,20))
     pygame.draw.rect(window,[255,255,255],(250,0,125,20),1)
     window.blit(font.render("Angle: %2.1f"%direction,0,[255,255,255]),(250,19))
-
+    ## Current Weapon
+    window.blit(font.render("Weapon: %r"%curWep,0,[255,255,255]),(0,40))
 
     #Do the physics
     deadBullets = []
