@@ -8,9 +8,9 @@ import time
 pygame.init()
 fpsClock = pygame.time.Clock()
 
-display = pygame.display.set_mode((600,600))
-window = pygame.Surface(display.get_size(),SRCALPHA)
-trails = pygame.Surface(window.get_size(),SRCALPHA)#This surface fades to transparent
+display = pygame.display.set_mode((600,600))#Bottom most layer
+trails = pygame.Surface(display.get_size(),SRCALPHA)#This surface fades to transparent
+window = pygame.Surface(display.get_size(),SRCALPHA)#Top most layer 
 
 pygame.display.set_caption("CastleThing")
 
@@ -27,8 +27,20 @@ class Player:
     x = 0
     y = 0
     color = [255,0,0]
-    def hit(self):
-        print "hit."
+    dammage = 0
+    def hit(self,b):
+        dmg = hypot(b.dx,b.dy)
+        self.dammage += dmg
+        print "Hit.",dmg
+        if self.dammage >= 10000:
+            players.remove(self)
+            for i in xrange(64):
+                b = Bullet()
+                factor = random.random()*5+10
+                b.dx=factor*10*cos(i*pi/32)
+                b.dy=factor*10*sin(i*pi/32)
+                b.x=self.x+b.dx/factor#each player is r=10px
+                b.y=self.y+b.dy/factor
 class Planet:
     x = 0
     y = 0
@@ -85,13 +97,14 @@ class SplitBullet(Bullet):
     splits = 0
     def __init__(self, splits = 3):
         Bullet.__init__(self)
-        self.splitTime = time.time()+.5
         self.splits = splits
+        v = 255-85*splits
+        self.color=[v,v,255]
     def step(self,dt):
         if Bullet.step(self,dt):
             return True
             
-        if time.time()<self.splitTime:
+        if self.distance < 100:
             return False
         if self.splits == 0 :
             return False
@@ -144,7 +157,7 @@ class CarpetBomb(Bullet):
             return True
         if self.distance < self.dropDist:
             return False
-        self.dropDist += 10
+        self.dropDist += 25
 
         dist = hypot(self.dy,self.dx)*0
         theta= atan2(self.dy,self.dx)
@@ -167,40 +180,53 @@ class CarpetBomb(Bullet):
         
 
 class PineappleBomb(AltitudeBullet):
+    color=[255,255,0]
     def hitPeak(self):
         dist = hypot(self.dy,self.dx)
-        for i in xrange(32):
-            b = Bullet()
+        for i in xrange(16):
+            b = SplitBullet(2)
             b.x=self.x
             b.y=self.y
-            b.dx=self.dx+dist*cos(i*pi/16)
-            b.dy=self.dy+dist*sin(i*pi/16)
+            b.dx=self.dx+dist*cos(i*pi/8)
+            b.dy=self.dy+dist*sin(i*pi/8)
         return True
 
 
+class MarkerBullet(Bullet):
+    deathTime = None
+    def step(self,dt):
+        if self.deathTime:
+            return time.time()>self.deathTime
+            
+        if Bullet.step(self,dt):
+            self.deathTime = time.time()+3
 
-class FanBullet(Bullet):
-    class MarkerBullet(Bullet):
-        deathTime = None
-        def step(self,dt):
-            if self.deathTime:
-                return time.time()>self.deathTime
-                
-            if Bullet.step(self,dt):
-                self.deathTime = time.time()+3
+class AngleBullet(Bullet):
                 
     def step(self,dt):
         dist = hypot(self.dy,self.dx)
         theta= atan2(self.dy,self.dx)
         for i in xrange(5):
             dtheta = .1*(i-2)
-            b = self.MarkerBullet()
+            b = MarkerBullet()
             b.x=self.x
             b.y=self.y
             b.dx=dist*cos(theta+dtheta)
             b.dy=dist*sin(theta+dtheta)        
         return True
-
+class PowerBullet(Bullet):
+                
+    def step(self,dt):
+        dist = hypot(self.dy,self.dx)
+        theta= atan2(self.dy,self.dx)
+        for i in xrange(5):
+            dpow = i-2
+            b = MarkerBullet()
+            b.x=self.x
+            b.y=self.y
+            b.dx=(dist+dpow)*cos(theta)
+            b.dy=(dist+dpow)*sin(theta)        
+        return True
 
 class PlayerSpawn(Bullet):
     def step(self,dt):
@@ -215,19 +241,22 @@ class PlayerSpawn(Bullet):
 weapons={}
 weapons[K_1]=Bullet
 weapons[K_2]=SplitBullet
-weapons[K_3]=FanBullet
+weapons[K_3]=AngleBullet
 weapons[K_4]=CarpetBomb
 weapons[K_5]=PineappleBomb
 weapons[K_6]=Frag
+weapons[K_7]=PowerBullet
 weapons[K_p]=PlayerSpawn
 ammo = {}
 ammo[Bullet]=1000
 ammo[SplitBullet]=10000
-ammo[FanBullet]=1000
+ammo[AngleBullet]=1000
+ammo[PowerBullet]=1000
 ammo[CarpetBomb]=100
 ammo[PineappleBomb]=500
 ammo[PlayerSpawn]=100
 ammo[Frag]=1000
+ammo[None]=0
 
 p1 = Player()
 p1.x=90
@@ -240,19 +269,16 @@ p2.y=400
 p1.color = generateColor(.5)
 
 
-pl1= Planet()
-pl1.x=400
-pl1.y=400
-pl1.r=100
-
-pl2= Planet()
-pl2.x=200
-pl2.y=200
-pl2.r=100
-
-
+planets = []
+for n in xrange(10):
+    if random.random()>.5: continue
+    p= Planet()
+    p.x=100+400*random.random()
+    p.y=100+400*random.random()
+    p.r=20+80*random.random()
+    planets.append(p)
 players = [p1,p2]
-planets = [pl1,pl2]
+
 
 bullets = []
     
@@ -271,8 +297,8 @@ def calcAccel(x,y):
 dt = 0
 
 
-direction = 1.7
-power = 90
+direction = 4.9#1.7
+power = 121#90
 keys = set()
 curWep = None
 
@@ -291,10 +317,16 @@ while True:
             if event.key in keys:
                 keys.remove(event.key)
     
-    if K_DOWN  in keys:  power = round(max(0,power-dt*30))
-    if K_UP    in keys:  power = round(min(300,power+dt*30))
+    if K_DOWN  in keys:  power = round(max(0,power-75-dt*30))+75
+    if K_UP    in keys:  power = round(min(100,power-75+dt*30))+75
     if K_RIGHT in keys:  direction = round((direction+dt*2)%(2*pi),1)
     if K_LEFT  in keys:  direction = round((direction-dt*2)%(2*pi),1)
+    
+    if K_w in keys:  p1.y-=dt*100
+    if K_s in keys:  p1.y+=dt*100
+    if K_a in keys:  p1.x-=dt*100
+    if K_d in keys:  p1.x+=dt*100
+    
     if K_SPACE in keys and curWep:
             if ammo[curWep] > 0:
                 ammo[curWep]-=1
@@ -329,12 +361,14 @@ while True:
 
 
     for p in planets:
-        pygame.gfxdraw.filled_circle(display,p.x,p.y,p.r-1,[100,100,100])
+        pygame.gfxdraw.filled_circle(display,int(p.x),int(p.y),int(p.r-1),[100,100,100])
 #        pygame.gfxdraw.aacircle(window,p.x,p.y,p.r,[100,100,100])
 #        pygame.gfxdraw.aacircle(window,[0,0,255], (p.x,p.y), p.r)
 
     for p in players:
         pygame.draw.circle(window,p.color, map(int,(p.x,p.y)), 10)
+        
+        window.blit(font.render("%5.2f"%p.dammage,0,[255,255,255]),map(int,(p.x,p.y)))
         
     for num,cnt in enumerate(ammo):
         pygame.draw.rect(window,[0,0,0],(0,num*5+20,ammo[cnt],5))
@@ -343,7 +377,7 @@ while True:
     ##Direction Marker
     pygame.draw.line(window,[0,0,0], (p1.x,p1.y), (int(p1.x+cos(direction)*10),int(p1.y+sin(direction)*10)))
     ##Power meter
-    pygame.draw.rect(window,[0,255,0],(0,0,power*2/3,20)) 
+    pygame.draw.rect(window,[0,255,0],(0,0,(power-75)*2,20)) 
     pygame.draw.rect(window,[255,255,255],(0,0,200,20),1)
     window.blit(font.render("Power: %i"%power,0,[255,255,255]),(0,19))
     ##Direction meter
@@ -352,6 +386,9 @@ while True:
     window.blit(font.render("Angle: %2.1f"%direction,0,[255,255,255]),(250,19))
     ## Current Weapon
     window.blit(font.render("Weapon: %r"%curWep,0,[255,255,255]),(0,40))
+    window.blit(font.render("Ammo: %r"%ammo[curWep],0,[255,255,255]),(0,60))
+    ## Active Bullets
+    window.blit(font.render("Bullets: %i"%len(bullets),0,[255,255,255]),(350,20))
 
     #Do the physics
     deadBullets = []
@@ -362,7 +399,7 @@ while True:
         else:
             for p in players:
                 if hypot(b.x-p.x,b.y-p.y)<=11 and b.distance>11:
-                    p.hit()
+                    p.hit(b)
                     deadBullets.append(b)
             pygame.draw.circle(window,b.color, (int(b.x),int(b.y)),2)
             pygame.draw.line(trails,b.color,(int(b.lx),int(b.ly)),(int(b.x),int(b.y)))
