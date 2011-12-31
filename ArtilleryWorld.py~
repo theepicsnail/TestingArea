@@ -9,8 +9,9 @@ pygame.init()
 fpsClock = pygame.time.Clock()
 
 display = pygame.display.set_mode((600,600))#Bottom most layer
-trails = pygame.Surface(display.get_size(),SRCALPHA)#This surface fades to transparent
-window = pygame.Surface(display.get_size(),SRCALPHA)#Top most layer 
+trails = pygame.Surface((1200,1200),SRCALPHA)#This surface fades to transparent
+window = pygame.Surface((1200,1200),SRCALPHA)#Top most layer 
+hud    = pygame.Surface((600,30))
 
 pygame.display.set_caption("CastleThing")
 
@@ -28,6 +29,7 @@ class Player:
     y = 0
     color = [255,0,0]
     dammage = 0
+    direction = 4.9
     def hit(self,b):
         dmg = hypot(b.dx,b.dy)
         self.dammage += dmg
@@ -262,7 +264,7 @@ p1 = Player()
 p1.x=90
 p1.y=200
 p1.color = generateColor(0)
-
+player = p1
 p2 = Player()
 p2.x=510
 p2.y=400
@@ -297,11 +299,10 @@ def calcAccel(x,y):
 dt = 0
 
 
-direction = 4.9#1.7
 power = 121#90
 keys = set()
 curWep = None
-
+TopLeft=(0,0)
 while True:
 
     #Process events
@@ -319,13 +320,26 @@ while True:
     
     if K_DOWN  in keys:  power = round(max(0,power-75-dt*30))+75
     if K_UP    in keys:  power = round(min(100,power-75+dt*30))+75
-    if K_RIGHT in keys:  direction = round((direction+dt*2)%(2*pi),1)
-    if K_LEFT  in keys:  direction = round((direction-dt*2)%(2*pi),1)
+    if K_RIGHT in keys:  player.direction = round((player.direction+dt*2)%(2*pi),1)
+    if K_LEFT  in keys:  player.direction = round((player.direction-dt*2)%(2*pi),1)
     
-    if K_w in keys:  p1.y-=dt*100
-    if K_s in keys:  p1.y+=dt*100
-    if K_a in keys:  p1.x-=dt*100
-    if K_d in keys:  p1.x+=dt*100
+    dx=0
+    dy=0
+    if K_w in keys:
+        dx=cos(player.direction)
+        dy=sin(player.direction)
+    if K_s in keys:
+        dx=-cos(player.direction)
+        dy=-sin(player.direction)
+    if K_d in keys:
+        dy=cos(player.direction)
+        dx=-sin(player.direction)
+    if K_a in keys:
+        dy=-cos(player.direction)
+        dx=sin(player.direction)
+    player.x+=dx*dt*100
+    player.y+=dy*dt*100
+    TopLeft=p1.x/2,p1.y/2
     
     if K_SPACE in keys and curWep:
             if ammo[curWep] > 0:
@@ -333,8 +347,8 @@ while True:
                 b = curWep()
                 b.x=p1.x
                 b.y=p1.y
-                b.dx=cos(direction)*power
-                b.dy=sin(direction)*power
+                b.dx=cos(player.direction)*power
+                b.dy=sin(player.direction)*power
             keys.remove(K_SPACE)
     wepSel = keys.intersection(weapons.keys())
     if wepSel:
@@ -362,12 +376,24 @@ while True:
 
     for p in planets:
         pygame.gfxdraw.filled_circle(display,int(p.x),int(p.y),int(p.r-1),[100,100,100])
+        
 #        pygame.gfxdraw.aacircle(window,p.x,p.y,p.r,[100,100,100])
 #        pygame.gfxdraw.aacircle(window,[0,0,255], (p.x,p.y), p.r)
 
     for p in players:
-        pygame.draw.circle(window,p.color, map(int,(p.x,p.y)), 10)
-        
+        #      0
+        #     / \
+        #    /   \
+        #   /  .  \    . = (x,y)
+        #  / _/ \_ \
+        # /_/     \_\
+        #//         \\
+        #1           2
+        points = [(10*cos(i*2*pi/3+p.direction)+p.x,10*sin(i*2*pi/3+p.direction)+p.y) for i in xrange(3)]
+        points = [points[0],points[1],(p.x,p.y),points[2],points[0]]
+        points = map(lambda x:map(int,x),points)
+        pygame.draw.polygon(window,p.color,points)
+#        pygame.draw.circle(window,p.color, map(int,(p.x,p.y)), 10)
         window.blit(font.render("%5.2f"%p.dammage,0,[255,255,255]),map(int,(p.x,p.y)))
         
     for num,cnt in enumerate(ammo):
@@ -375,15 +401,15 @@ while True:
         
     #HUD
     ##Direction Marker
-    pygame.draw.line(window,[0,0,0], (p1.x,p1.y), (int(p1.x+cos(direction)*10),int(p1.y+sin(direction)*10)))
+    pygame.draw.line(window,[0,0,0], (p1.x,p1.y), (int(p1.x+cos(player.direction)*10),int(p1.y+sin(player.direction)*10)))
     ##Power meter
     pygame.draw.rect(window,[0,255,0],(0,0,(power-75)*2,20)) 
     pygame.draw.rect(window,[255,255,255],(0,0,200,20),1)
     window.blit(font.render("Power: %i"%power,0,[255,255,255]),(0,19))
     ##Direction meter
-    pygame.draw.rect(window,[0,255,0],(250,0,direction*20,20))
+    pygame.draw.rect(window,[0,255,0],(250,0,player.direction*20,20))
     pygame.draw.rect(window,[255,255,255],(250,0,125,20),1)
-    window.blit(font.render("Angle: %2.1f"%direction,0,[255,255,255]),(250,19))
+    window.blit(font.render("Angle: %2.1f"%player.direction,0,[255,255,255]),(250,19))
     ## Current Weapon
     window.blit(font.render("Weapon: %r"%curWep,0,[255,255,255]),(0,40))
     window.blit(font.render("Ammo: %r"%ammo[curWep],0,[255,255,255]),(0,60))
@@ -405,8 +431,9 @@ while True:
             pygame.draw.line(trails,b.color,(int(b.lx),int(b.ly)),(int(b.x),int(b.y)))
     
     map(bullets.remove,deadBullets)
-    display.blit(trails,(0,0))
-    display.blit(window,(0,0))
+    pos = map(lambda x:-1*x,TopLeft)
+    display.blit(trails,pos)
+    display.blit(window,pos)
     pygame.display.update()
     dt = fpsClock.tick(30)/1000.0
 

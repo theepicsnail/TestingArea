@@ -47,33 +47,42 @@ class SOLID(Cell):
     canEnter = lambda x:False
 class HUMAN(AttackableCell):
     attack = 10
+    breedChance = .2
     health = 100
-    dmg    = 0
     color  = (0,255,0)
     age    = 0
     def step(self,world):
         self.age = self.age+1
-        self.dmg += .01
+        self.dmg += .1
         self.attack += .01
         return self.alive()
     def breed(self,other):
         print "Breed"
-        if self.age<10 or other.age<10: return        
+        if self.age<10 or other.age<10: return
+        if random()>(self.breedChance+other.breedChance)/2: return        
         merge = lambda a,b:(a+b)*(.9+.2*random())/2
         child = HUMAN()
         child.attack = merge(other.attack,self.attack)
         child.health = merge(other.health,self.health)
-        self.health -= 30
-        other.health -= 30
+        child.breedChance = merge(other.breedChance,self.breedChance)
+        self.dmg += 10
+        other.dmg += 10
         print child.attack, child.health
         return child
+    def attackHuman(self):
+        return random()>.5
 class ZOMBIE(AttackableCell):
-    attack = 30
-    health = 100
+    attack = 5
+    health = 75
     color = (255,0,0)
     def step(self,world):
         self.dmg += .1
         return self.alive()
+    def convert(self,src):
+        z = ZOMBIE()
+        z.attack = self.attack*(random()*.1+.9)
+        z.health = src.health*.75*(random()*.1+.9)
+        return z
 def drawCells(world):
     global window,colors
     size = 20
@@ -150,19 +159,32 @@ def updateCells(world):
         targPos = (d[0]+r,d[1]+c)
         targ = world[targPos[0]][targPos[1]]
         doMove = False
+        died = False
         if isinstance(targ,HUMAN) and isinstance(world[r][c],HUMAN):
             print "Human collision",world[r-d[0]][c-d[1]],r-d[0],c-d[1]
-            if isinstance(world[r-d[0]][c-d[1]],SPACE):
+            if world[r][c].attackHuman():
+                died = targ.dammage(world[r][c].getAttack())
+                if died:
+                    doMove = True
+                    dead.append(targPos)    
+            elif isinstance(world[r-d[0]][c-d[1]],SPACE):
                 child = world[r][c].breed(targ)
                 if child:
                     world[r-d[0]][c-d[1]] = child
-                    continue
+                continue
             
-        if targ.canEnter():
-            doMove = True
-        elif targ.canAttack():
-            print "attack!"
-            died = targ.dammage(world[r][c].getAttack())
+        elif isinstance(targ,ZOMBIE) and isinstance(world[r][c],ZOMBIE):
+            continue
+        else:    
+            if targ.canEnter():
+                doMove = True
+            elif targ.canAttack():
+                print "attack!"
+                died = targ.dammage(world[r][c].getAttack())
+                if isinstance(targ,HUMAN):
+                    died = False
+                    world[targPos[0]][targPos[1]] = world[r][c].convert(targ)
+
             if died:
                 doMove = True
                 dead.append(targPos)
@@ -182,9 +204,8 @@ world=[[]]
 world[0] = [SOLID()]*20
 world += [[SOLID()]+[SPACE()]*18+[SOLID()] for x in range(18)]
 world += [[SOLID()]*20]
-world[3][3] = HUMAN()
-world[2][2] = HUMAN()
-world[4][4] = HUMAN()
+for n in xrange(1,5):
+    world[n][n] = HUMAN()
 world[-2][-2]=ZOMBIE()
 
 humanDrop = True
@@ -215,7 +236,7 @@ while True:
         if spec == HUMAN:
             color = (0,255,0)
             
-        pygame.draw.line(window,color,(400,n*10),(400+int(health),n*10),10)
+        pygame.draw.line(window,color,(400,n*1),(400+int(health),n*1),1)
     pygame.display.update()
     fpsClock.tick(30)
 
